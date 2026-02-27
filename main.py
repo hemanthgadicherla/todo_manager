@@ -1,84 +1,84 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
 
 # 1. Create the application instance
 app = FastAPI()
 
-list1 = [
-    {"id": 1, "data": {"title": "Buy Milk", "description": "Get 2L of semi-skimmed milk", "time": "08:00 AM"}},
-    {"id": 2, "data": {"title": "Workout", "description": "Morning cardio and weights", "time": "07:00 AM"}},
-    {"id": 3, "data": {"title": "Meeting", "description": "Sync with the design team", "time": "10:00 AM"}},
-    {"id": 4, "data": {"title": "Code Review", "description": "Review PRs for the new API", "time": "02:00 PM"}},
-    {"id": 5, "data": {"title": "Grocery Shopping", "description": "Buy vegetables and fruits", "time": "06:00 PM"}}
-]
+# Database Setup
+# !!! IMPORTANT: Replace 'YOUR_PASSWORD' with your actual PostgreSQL password !!!
+DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/postgres"
 
-# Global counter for IDs matching the seeded data
-todo_index = 5
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
+# Database Model (Matches your PostgreSQL table)
+class Todo(Base):
+    __tablename__ = "todos"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text)
+    time = Column(String(50))
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Pydantic Model for API requests
 class TodoItem(BaseModel):
     title: str
     description: str
     time: str
 
-class calculate(BaseModel):
-    num1: int
-    num2: int
+# --- Endpoints ---
 
-class UserProfile(BaseModel):
-    first_name: str
-    last_name: str
-
-# 2. Define a root endpoint
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to my first FastAPI!"}
-
-# 3. Define an endpoint with a parameter
-@app.get("/hello/{name}")
-def say_hello(name: str):
-    return {"message": f"Hello, {name}!"}
-
-@app.post("/profile")
-def create_profile(profile: UserProfile):
-    # This automatically converts JSON input into a Python object!
-    fullname = f"{profile.first_name} {profile.last_name}"
-    return {"status": "Success", "full_name": fullname}
-
-@app.post("/math")
-def cal(math1: calculate): 
-    sum1 = math1.num1 + math1.num2
-    multiplication = math1.num1 * math1.num2
-    return {"status": "Success", "sum": sum1, "multiplication": multiplication}
+    return {"message": "Welcome to my first FastAPI with PostgreSQL!"}
 
 @app.post("/todoapp")
-def create_todo(todo: TodoItem):
-    global todo_index
-    todo_index += 1
-    # Adding ID to the record
-    todo_record = {"id": todo_index, "data": todo}
-    list1.append(todo_record)
-    return {"status": "Success", "todo": todo_record}
+def create_todo(todo: TodoItem, db: Session = Depends(get_db)):
+    db_todo = Todo(
+        title=todo.title,
+        description=todo.description,
+        time=todo.time
+    )
+    db.add(db_todo)
+    db.commit()
+    db.refresh(db_todo)
+    return {"status": "Success", "todo": db_todo}
 
 @app.get("/todoapp/{id}")
-def get_todo(id: int):
-    for i in list1:
-        if i["id"]==id:
-            return {"status": "Success", "todo": i}
-    return {"status": "Error", "todo": "not found"}
-
+def get_todo(id: int, db: Session = Depends(get_db)):
+    todo = db.query(Todo).filter(Todo.id == id).first()
+    if todo:
+        return {"status": "Success", "todo": todo}
+    raise HTTPException(status_code=404, detail="Todo not found")
 
 @app.delete("/todoapp/{id}")
-def delete_todo(id: int):
-    for i in list1:
-        if i["id"] == id:
-            list1.remove(i)
-            return {"status": "Success", "todo": f"deleted {id}", "list": list1}
-    return {"status": "Error", "todo": "not found"}
+def delete_todo(id: int, db: Session = Depends(get_db)):
+    todo = db.query(Todo).filter(Todo.id == id).first()
+    if todo:
+        db.delete(todo)
+        db.commit()
+        return {"status": "Success", "message": f"Deleted todo with ID {id}"}
+    raise HTTPException(status_code=404, detail="Todo not found")
 
 @app.put("/todoapp/{id}")
-def update_todo(id: int, todo: TodoItem):
-    for i in list1:
-        if i["id"] == id:
-            i["data"] = todo
-            return {"status": "Success", "todo": f"updated {id}", "list": list1}
-    return {"status": "Error", "todo": "not found"}
+def update_todo(id: int, todo: TodoItem, db: Session = Depends(get_db)):
+    db_todo = db.query(Todo).filter(Todo.id == id).first()
+    if db_todo:
+        db_todo.title = todo.title
+        db_todo.description = todo.description
+        db_todo.time = todo.time
+        db.commit()
+        db.refresh(db_todo)
+        return {"status": "Success", "todo": db_todo}
+    raise HTTPException(status_code=404, detail="Todo not found")
