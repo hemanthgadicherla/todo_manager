@@ -1,3 +1,8 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+
 from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String
@@ -8,7 +13,7 @@ from sqlalchemy.orm import sessionmaker, Session
 app = FastAPI()
 
 # --- DATABASE SETUP (The "Restaurant Infrastructure") ---
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/postgres"
+DATABASE_URL = os.getenv("DB_URL")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -48,44 +53,6 @@ class TodoItem(BaseModel):
     description: str
     time: str
 
-# class calculate(BaseModel):
-#     num1: int
-#     num2: int
-
-# class UserProfile(BaseModel):
-#     first_name: str
-#     last_name: str
-
-# # 2. Define a root endpoint
-# @app.get("/")
-# def read_root():
-#     return {"message": "Welcome to my first FastAPI!"}
-
-# # 3. Define an endpoint with a parameter
-# @app.get("/hello/{name}")
-# def say_hello(name: str):
-#     return {"message": f"Hello, {name}!"}
-
-# @app.post("/profile")
-# def create_profile(profile: UserProfile):
-#     # This automatically converts JSON input into a Python object!
-#     fullname = f"{profile.first_name} {profile.last_name}"
-#     return {"status": "Success", "full_name": fullname}
-
-# @app.post("/math")
-# def cal(math1: calculate): 
-#     sum1 = math1.num1 + math1.num2
-#     multiplication = math1.num1 * math1.num2
-#     return {"status": "Success", "sum": sum1, "multiplication": multiplication}
-
-@app.post("/todoapp")
-def create_todo(todo: TodoItem):
-    global todo_index
-    todo_index += 1
-    # Adding ID to the record
-    todo_record = {"id": todo_index, "data": todo}
-    list1.append(todo_record)
-    return {"status": "Success", "todo": todo_record}
 
 # --- NEW: POST TODO TO DATABASE ---
 @app.post("/db/todoapp")
