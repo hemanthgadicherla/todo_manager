@@ -67,26 +67,77 @@ def create_todo_db(todo: TodoItem, db: Session = Depends(get_db)):
     db.refresh(new_todo)
     return {"status": "Success", "todo": new_todo}
 
-@app.get("/todoapp/{id}")
-def get_todo(id: int):
-    for i in list1:
-        if i["id"]==id:
-            return {"status": "Success", "todo": i}
-    return {"status": "Error", "todo": "not found"}
+# --- NEW: GET ALL TODOS FROM DATABASE ---
+@app.get("/db/todoapp")
+def get_todos_db(db: Session = Depends(get_db)):
+    # 1. Ask the waiter (db) to get all plates (Todo items) from the kitchen
+    all_todos = db.query(Todo).all()
+    return {"status": "Success", "todos": all_todos}
+
+# --- NEW: GET SINGLE TODO FROM DATABASE ---
+@app.get("/db/todoapp/{id}")
+def get_todo_db(id: int, db: Session = Depends(get_db)):
+    # 1. Ask the waiter to find a specific plate by ID
+    todo = db.query(Todo).filter(Todo.id == id).first()
+    if not todo:
+        return {"status": "Error", "message": "Todo not found"}
+    return {"status": "Success", "todo": todo}
+
+# --- NEW: DELETE TODO FROM DATABASE ---
+@app.delete("/db/todoapp/{id}")
+def delete_todo_db(id: int, db: Session = Depends(get_db)):
+    # 1. Ask the waiter to find the plate in the kitchen
+    todo = db.query(Todo).filter(Todo.id == id).first()
+    if not todo:
+        return {"status": "Error", "message": "Todo not found"}
+    
+    # 2. Tell the waiter to remove it from the session
+    db.delete(todo)
+    
+    # 3. Confirm to the kitchen (Commit)
+    db.commit()
+    return {"status": "Success", "message": f"Deleted todo with ID {id}"}
+
+# --- NEW: UPDATE (PUT) TODO IN DATABASE ---
+@app.put("/db/todoapp/{id}")
+def update_todo_db(id: int, todo_update: TodoItem, db: Session = Depends(get_db)):
+    # 1. Ask the waiter to find the plate to modify
+    todo = db.query(Todo).filter(Todo.id == id).first()
+    if not todo:
+        return {"status": "Error", "message": "Todo not found"}
+    
+    # 2. Update the plate's details
+    todo.title = todo_update.title
+    todo.description = todo_update.description
+    todo.time = todo_update.time
+    
+    # 3. Confirm to the kitchen (Commit)
+    db.commit()
+    
+    # 4. Refresh to see the updated version
+    db.refresh(todo)
+    return {"status": "Success", "todo": todo}
+
+# @app.get("/todoapp/{id}")
+# def get_todo(id: int):
+#     for i in list1:
+#         if i["id"]==id:
+#             return {"status": "Success", "todo": i}
+#     return {"status": "Error", "todo": "not found"}
 
 
-@app.delete("/todoapp/{id}")
-def delete_todo(id: int):
-    for i in list1:
-        if i["id"] == id:
-            list1.remove(i)
-            return {"status": "Success", "todo": f"deleted {id}", "list": list1}
-    return {"status": "Error", "todo": "not found"}
+# @app.delete("/todoapp/{id}")
+# def delete_todo(id: int):
+#     for i in list1:
+#         if i["id"] == id:
+#             list1.remove(i)
+#             return {"status": "Success", "todo": f"deleted {id}", "list": list1}
+#     return {"status": "Error", "todo": "not found"}
 
-@app.put("/todoapp/{id}")
-def update_todo(id: int, todo: TodoItem):
-    for i in list1:
-        if i["id"] == id:
-            i["data"] = todo
-            return {"status": "Success", "todo": f"updated {id}", "list": list1}
-    return {"status": "Error", "todo": "not found"}
+# @app.put("/todoapp/{id}")
+# def update_todo(id: int, todo: TodoItem):
+#     for i in list1:
+#         if i["id"] == id:
+#             i["data"] = todo
+#             return {"status": "Success", "todo": f"updated {id}", "list": list1}
+#     return {"status": "Error", "todo": "not found"}
